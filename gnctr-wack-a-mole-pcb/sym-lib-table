@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name "gnctr-wam-relaylib")(type "KiCad")(uri "${KIPRJMOD}/gnctr-wam-relaylib.kicad_sym")(options "")(descr ""))
+)

@@ -1,0 +1,3 @@
+(fp_lib_table
+  (lib (name "gnctr-wam-footprints")(type "KiCad")(uri "${KIPRJMOD}/gnctr-wam-footprints.pretty")(options "")(descr ""))
+)
