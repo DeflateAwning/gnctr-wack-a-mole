@@ -133,24 +133,23 @@ void run_test() {
   delay(1000);
 
   
-  Serial.println("Turning lights on.");
+  Serial.println("Turning lights on and off.");
   for (int light_num = 1; light_num <= 8; light_num++) {
     set_light_status(light_num, 1);
     delay(750);
-  }
-  Serial.println("Turning lights off.");
-  for (int light_num = 1; light_num <= 8; light_num++) {
     set_light_status(light_num, 0);
     delay(750);
   }
 
-  for (int i = 0; i < 12; i++) {
-    Serial.println("Reading switch states for 12 sec.");
+  for (int i = 0; i < 120; i++) {
+    Serial.println("Reading switch states for 12 sec, and writing it to lights.");
     for (int switch_num = 1; switch_num <= 10; switch_num++) {
       Serial.print("Switch "); Serial.print(switch_num); Serial.print(" = ");
       Serial.println(is_switch_pressed(switch_num));
+
+      if (switch_num <= 8) set_light_status(switch_num, is_switch_pressed(switch_num));
     }
-    delay(1000);
+    delay(100);
   }
 }
 
@@ -411,4 +410,3 @@ void UpdateScore() {
 void MatrixTest() {
   Serial.println("Running MatrixTest().");
 }
-

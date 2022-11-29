@@ -9,3 +9,7 @@ This firmware is the firmware for the GNCTR wack-a-mole project for the 2023 com
 4. Install required dependencies by going to Sketch > Include Library > Manage Libraries..., then searching for:
     * **TM1637** (v1.2.0, by Avishay Orpaz)
 5. Build and run the code.
+
+## Critical Notes
+* Each powered relay uses a ton of current. To prevent brownouts, only 3ish lights/relays can be active at once. Do not ever turn on all lights at once.
+
