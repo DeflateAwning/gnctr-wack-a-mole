@@ -34,6 +34,19 @@ const int config_game_duration_sec = 30;
 
 const int eeprom_hi_score_address = 284; // random address
 
+const uint8_t SEG_PATTERN_TEST[] = {
+    SEG_F | SEG_E | SEG_G | SEG_D,                   // t
+    SEG_A | SEG_D | SEG_E | SEG_F | SEG_G,           // E
+    SEG_A | SEG_F | SEG_G | SEG_C | SEG_D,           // S
+    SEG_F | SEG_E | SEG_G | SEG_D                    // t
+};
+const uint8_t SEG_DONE[] = {
+    SEG_B | SEG_C | SEG_D | SEG_E | SEG_G,           // d
+    SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F,   // O
+    SEG_C | SEG_E | SEG_G,                           // n
+    SEG_A | SEG_D | SEG_E | SEG_F | SEG_G            // E
+};
+
 int buttonState[8] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // State of Input Switches to detect whe button is pressed
 int lastButtonState[8] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // State of button last time looped.
 
@@ -49,8 +62,6 @@ int score = 0;
 int newMole;
 long startTimer;
 int game_duration_sec = config_game_duration_sec;
-long idle_start_time_ms; // Used to calculate how long since idle on start up
-boolean bonusUsed = false;
 
 
 int get_switch_pin_number(int switch_num) {
@@ -124,9 +135,6 @@ void setup() {
     // Run Test
     run_test();
 
-    // Game Logic
-    idle_start_time_ms = millis();
-
 }
 
 void run_test() {
@@ -150,6 +158,8 @@ void run_test() {
     seg3.setSegments(seg_data_all_on);
     delay(1000);
 
+    seg1.setSegments(SEG_PATTERN_TEST);
+    seg3.setSegments(SEG_PATTERN_TEST);
 
     Serial.println("Turning lights on and off.");
     for (int light_num = 1; light_num <= 8; light_num++) {
@@ -178,15 +188,17 @@ void loop() {
 
 
 void game_loop() {
-    // TODO add scrolling "Press Start"
-
+    
     seg_cur_score.clear();
     seg_hi_score.showNumberDec(cur_hi_score, false);
+
+    unsigned long idle_start_time_ms = millis();
 
     while (1) {
 
         if (is_switch_pressed(START_SWITCH_NUM)) {
             run_one_round_of_game();
+            idle_start_time_ms = millis();
         }
 
         if (is_switch_pressed(RESET_SCORE_SWITCH_NUM)) {
@@ -196,16 +208,45 @@ void game_loop() {
             do_display_score();
         }
 
+        if (millis() - idle_start_time_ms > 10000) {
+            // start the "Press Start" thing
+            const int msg_len = 14;
+            int offset = ((millis() - idle_start_time_ms) / 500) % (msg_len);
+
+            const uint8_t SEG_PRESS_START[] = {
+                SEG_A | SEG_B | SEG_F | SEG_E | SEG_G,           // P
+                SEG_E | SEG_G,                                   // r
+                SEG_A | SEG_D | SEG_E | SEG_F | SEG_G,           // E
+                SEG_A | SEG_F | SEG_G | SEG_C | SEG_D,           // S
+                SEG_A | SEG_F | SEG_G | SEG_C | SEG_D,           // S
+                0,
+                SEG_A | SEG_F | SEG_G | SEG_C | SEG_D,           // S
+                SEG_F | SEG_E | SEG_G | SEG_D,                   // t
+                SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,   // A
+                SEG_E | SEG_G,                                   // r
+                SEG_F | SEG_E | SEG_G | SEG_D,                   // t
+                0,0,0
+            };
+            uint8_t seg1_data[] = {SEG_D, SEG_D, SEG_D, SEG_D};
+            uint8_t seg2_data[] = {SEG_D, SEG_D, SEG_D, SEG_D};
+
+            for (int i = 0; i < 4; i++) {
+                seg1_data[i] = SEG_PRESS_START[(i+offset)%msg_len];
+                seg2_data[i] = SEG_PRESS_START[(i+offset+5)%msg_len];
+            }
+
+            seg_cur_score.setSegments(seg1_data);
+            //seg_hi_score.setSegments(seg2_data); // doesn't look that great, show the high score instead
+        }
+
         delay(10);
     }
 }
 
 void run_one_round_of_game() {
-    int i;
-    int timeLeft;
-    long nowtime;
+
+    int time_left_sec;
     long keytime;
-    long startTimeLeft;
     randomSeed(analogRead(0));
 
     // do countdown at start of game ("5555", "4444", etc.)
@@ -222,7 +263,7 @@ void run_one_round_of_game() {
     molesLit = 0;
     score = 0;
     game_duration_sec = config_game_duration_sec;
-    bonusUsed = false;
+    boolean bonusUsed = false;
     
     do_display_score();
 
@@ -288,8 +329,7 @@ void run_one_round_of_game() {
         // Check Status of Moles
         for (int i = 0; i <= 7; i++) {
             if (moleActive[i]) {
-                nowtime = millis();
-                if (moleEnd[i] < nowtime) {
+                if (moleEnd[i] < millis()) {
                     Serial.println((String) "Mole " + i + " timed out.");
                     // Set new mole first so current active one not selected;
                     AddMole();
@@ -301,18 +341,21 @@ void run_one_round_of_game() {
         } // End For
 
 
-        timeLeft = game_duration_sec - int((millis() - startTimer) / 1000);
-        // Serial.println(timeLeft);
-        if (timeLeft >= 10) {
+        time_left_sec = game_duration_sec - int((millis() - startTimer) / 1000);
+        // Serial.println(time_left_sec);
+        if (time_left_sec >= 10) {
             // seg_cur_score.blinkRate(0);
-        } else if (timeLeft >= 6) {
+        } else if (time_left_sec >= 6) {
             // seg_cur_score.blinkRate(1);
         } else {
             // seg_cur_score.blinkRate(2);
         }
-        if (timeLeft <= 0) {
+        if (time_left_sec <= 0) {
             Finished = true;
         }
+
+        // TODO add a countdown timer in the last bit of the game
+
         // When game ends, Finished is set to TRUE
     } while (Finished == false);
 
@@ -336,9 +379,9 @@ void run_one_round_of_game() {
         for (int i = 0; i < 10; i++) {
             seg_cur_score.clear();
             seg_hi_score.clear();
-            delay(750);
+            delay(1000);
             do_display_score();
-            delay(250);
+            delay(500);
         }
 
     }

@@ -14,7 +14,5 @@ This firmware is the firmware for the GNCTR wack-a-mole project for the 2023 com
 * Each powered relay uses a ton of current. To prevent brownouts, only 3ish lights/relays can be active at once. Do not ever turn on all lights at once.
 
 ## Current To-Do List
-* Add a "Push Start" text across the 7-seg display(s), maybe scrolling.
-* Need to convert things to a new library for the 7-segment displays (currently present in the testing code on the new repo)
-* Implement blinking
-
+* Add a countdown timer at the end of the game.
+* Add "dOnE" text when the game is done (or show all zeros).
