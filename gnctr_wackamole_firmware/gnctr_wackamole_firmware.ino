@@ -40,7 +40,7 @@ const uint8_t SEG_PATTERN_TEST[] = {
     SEG_A | SEG_F | SEG_G | SEG_C | SEG_D,           // S
     SEG_F | SEG_E | SEG_G | SEG_D                    // t
 };
-const uint8_t SEG_DONE[] = {
+const uint8_t SEG_PATTERN_DONE[] = {
     SEG_B | SEG_C | SEG_D | SEG_E | SEG_G,           // d
     SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F,   // O
     SEG_C | SEG_E | SEG_G,                           // n
@@ -177,8 +177,17 @@ void run_test() {
 
             if (switch_num <= 8) set_light_status(switch_num, is_switch_pressed(switch_num));
         }
+
+        if (is_switch_pressed(START_SWITCH_NUM)) {
+            Serial.println("Early exit from START switch press.");
+            delay(1000);
+            break;
+        }
         delay(100);
     }
+
+    // force all lights off
+    set_all_light_status(0);
 }
 
 void loop() {
@@ -381,13 +390,16 @@ void run_one_round_of_game() {
     } while (Finished == false);
 
     // turn off all lights at end of game
-    for (int i = 0; i <= 7; i++) {
-        set_light_status(i+1, 0);
-    }
+    set_all_light_status(0);
 
     // Wait a few seconds to show score
-    seg_cur_score.clear();
-    delay(2000);
+    seg_cur_score.clear(); // maybe unnecessary
+    for (int i = 0; i < 5; i++) {
+        seg_cur_score.setSegments(SEG_PATTERN_DONE);
+        delay(400);
+        seg_cur_score.clear();
+        delay(300);
+    }
 
     do_display_score();
     if (score >= cur_hi_score) {
