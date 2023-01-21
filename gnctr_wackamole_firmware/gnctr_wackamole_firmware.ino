@@ -23,6 +23,8 @@ TM1637Display seg3(PIN_SEG3_CLK, PIN_SEG3_DIO);
 #define START_SWITCH_NUM 9 // switch number of Start button
 #define RESET_SCORE_SWITCH_NUM 10 // reset the high score
 
+#define SEG_COLON_CODE 0b01000000
+
 const int startLitTime = 3000; // How long Moles Stay Lit at Start of Games
 const int Level2000ms = 50; // Score when Moles Lit Time changes to 2 seconds
 const int Level1000ms = 200; // Score when Moles Lit Time changes to 1 second
@@ -30,7 +32,7 @@ const int Level500ms = 400; // Score when Moles Lit Time changes to half a secon
 const int MoleLevel2 = 100; // Score when number of Moles at a time changes from 1 to 2
 const int MoleLevel3 = 300; // Score when number of Moles at a time changes from 2 to 3
 
-const int config_game_duration_sec = 30;
+const long config_game_duration_sec = 30;
 
 const int eeprom_hi_score_address = 284; // random address
 
@@ -60,8 +62,8 @@ boolean Finished;
 int molesLit = 0; // Number of moles lit
 int score = 0;
 int newMole;
-long startTimer;
-int game_duration_sec = config_game_duration_sec;
+long game_start_time_millis;
+long game_duration_sec = config_game_duration_sec;
 
 
 int get_switch_pin_number(int switch_num) {
@@ -214,11 +216,11 @@ void game_loop() {
             // reset the high score
             cur_hi_score = 100;
             store_hi_score(cur_hi_score);
-            do_display_score();
+            do_display_hi_score();
         }
 
         if (millis() - idle_start_time_ms > 10000) {
-            // start the "Press Start" thing
+            // start the "Press Start" rotation display
             const int msg_len = 14;
             int offset = ((millis() - idle_start_time_ms) / 500) % (msg_len);
 
@@ -255,6 +257,7 @@ void game_loop() {
 void run_one_round_of_game() {
 
     int time_left_sec;
+    long time_left_ms;
     long keytime;
     long last_button_press_millis;
     randomSeed(analogRead(0));
@@ -286,7 +289,7 @@ void run_one_round_of_game() {
         moleActive[i] = false;
     }
 
-    startTimer = millis();
+    game_start_time_millis = millis();
     last_button_press_millis = millis();
     AddMole();
 
@@ -323,7 +326,7 @@ void run_one_round_of_game() {
                             AddMole();
                         }
 
-                        // Now check if score over 500 then add 15 seconds
+                        // check if score over 500 then add 15 seconds
                         if (bonusUsed == false && score >= 500) {
                             bonusUsed = true;
                             game_duration_sec = config_game_duration_sec + 15;
@@ -363,19 +366,12 @@ void run_one_round_of_game() {
             }
         } // End For
 
-
-        time_left_sec = game_duration_sec - int((millis() - startTimer) / 1000);
-        // Serial.println(time_left_sec);
-        if (time_left_sec >= 10) {
-            // seg_cur_score.blinkRate(0);
-        } else if (time_left_sec >= 6) {
-            // seg_cur_score.blinkRate(1);
-        } else {
-            // seg_cur_score.blinkRate(2);
-        }
+        // show timer
+        time_left_sec = game_duration_sec - int((millis() - game_start_time_millis) / 1000);
+        //time_left_ms = (game_duration_sec) * 1000 - (millis() - game_start_time_millis);
+        time_left_ms = (game_duration_sec * 1000) + game_start_time_millis - millis();
+        do_display_time_remaining(time_left_ms);
         
-        // TODO add a countdown timer in the last bit of the game
-
         // end game conditions
         if (time_left_sec <= 0) {
             Finished = true;
@@ -396,24 +392,30 @@ void run_one_round_of_game() {
     seg_cur_score.clear(); // maybe unnecessary
     for (int i = 0; i < 5; i++) {
         seg_cur_score.setSegments(SEG_PATTERN_DONE);
+        seg_hi_score.showNumberDecEx(0, SEG_COLON_CODE, true); // flash 0
         delay(400);
         seg_cur_score.clear();
+        seg_hi_score.clear();
         delay(300);
     }
 
     do_display_score();
+    do_display_hi_score();
+    delay(1000);
+
     if (score >= cur_hi_score) {
 
         cur_hi_score = score;
         store_hi_score(cur_hi_score);
-        do_display_score();
         
         // blink the new score and high score for 5000ms
         for (int i = 0; i < 6; i++) {
             seg_cur_score.clear();
             seg_hi_score.clear();
             delay(500);
+
             do_display_score();
+            do_display_hi_score();
             delay(1000);
         }
 
@@ -469,7 +471,26 @@ void ChooseMole() {
 
 void do_display_score() {
     seg_cur_score.showNumberDec(score, false);
+}
+
+void do_display_hi_score() {
     seg_hi_score.showNumberDec(cur_hi_score, false);
+}
+
+void do_display_time_remaining(long time_left_ms) {
+    if (time_left_ms < 0) time_left_ms = 0; // never show a negative
+
+    long time_left_hundredths = time_left_ms / 10;
+    long time_left_sec = time_left_ms / 1000;
+
+    if (time_left_hundredths > 999) {
+        // second countdown
+        seg_hi_score.showNumberDecEx(time_left_sec, SEG_COLON_CODE, true);
+    }
+    else {
+        // finite countdown
+        seg_hi_score.showNumberDecEx(time_left_hundredths, SEG_COLON_CODE, true);
+    }
 }
 
 void MatrixTest() {
