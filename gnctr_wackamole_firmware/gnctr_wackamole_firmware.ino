@@ -247,18 +247,19 @@ void run_one_round_of_game() {
 
     int time_left_sec;
     long keytime;
+    long last_button_press_millis;
     randomSeed(analogRead(0));
 
     // do countdown at start of game ("5555", "4444", etc.)
     for (int countdown_num = 5555; countdown_num >= 1111; countdown_num -= 1111) {
         seg_cur_score.showNumberDec(countdown_num, false);
         seg_hi_score.showNumberDec(countdown_num, false);
-        delay(750);
+        delay(800);
     }
 
     seg_hi_score.clear();
     seg_cur_score.clear();
-    delay(750);
+    delay(800);
 
     molesLit = 0;
     score = 0;
@@ -277,10 +278,11 @@ void run_one_round_of_game() {
     }
 
     startTimer = millis();
+    last_button_press_millis = millis();
     AddMole();
 
-    do {
-        for (int i = 0; i <= 7; i++) {
+    do { // do while game is not finished
+        for (int i = 0; i <= 7; i++) { // i = current button we're checking
             buttonState[i] = is_switch_pressed(i+1);
             if (buttonState[i] == 1 && lastButtonState[i] == 0) { // then key has been pressed as state changed from 0 to 1
                 keytime = millis() - lastPressed[i];
@@ -289,22 +291,29 @@ void run_one_round_of_game() {
                 } else {
                     lastPressed[i] = millis();
                     Serial.print((String) "Button " + i + " pressed: " + buttonState[i]);
+                    last_button_press_millis = millis();
+
                     if (moleActive[i] == true) {
                         score = score + 10;
                         do_display_score();
+                        
                         // Set new mole first so current active one not selected;
                         AddMole();
+                        // TODO if we want more moles active at a time, we gotta do an off-before-on thing here so we don't use too much relay current
+
+                        // Unlight this mole
                         molesLit = molesLit - 1;
                         moleActive[i] = 0;
-                        // const MoleLevel2 = 100;
-                        // const MoleLevel3 = 300;
                         set_light_status(i+1, 0);
+
+                        // Add more moles if it's a higher level
                         if (score >= MoleLevel2 && molesLit <= 1) {
                             AddMole();
                         }
                         if (score >= MoleLevel3 && molesLit <= 2) {
                             AddMole();
                         }
+
                         // Now check if score over 500 then add 15 seconds
                         if (bonusUsed == false && score >= 500) {
                             bonusUsed = true;
@@ -320,6 +329,8 @@ void run_one_round_of_game() {
                     } // End Else
                 }
             }
+
+            // part of debouncing
             // if (buttonState[i]==0 && lastButtonState[i] == 1)
             // then button released and not need to deal with that event
             lastButtonState[i] = buttonState[i];
@@ -331,8 +342,11 @@ void run_one_round_of_game() {
             if (moleActive[i]) {
                 if (moleEnd[i] < millis()) {
                     Serial.println((String) "Mole " + i + " timed out.");
+                    
                     // Set new mole first so current active one not selected;
                     AddMole();
+                    
+                    // Unlight old mole
                     molesLit = molesLit - 1;
                     moleActive[i] = 0;
                     set_light_status(i+1, 0);
@@ -350,11 +364,18 @@ void run_one_round_of_game() {
         } else {
             // seg_cur_score.blinkRate(2);
         }
+        
+        // TODO add a countdown timer in the last bit of the game
+
+        // end game conditions
         if (time_left_sec <= 0) {
             Finished = true;
+            Serial.println("Ending game because the timer ran out.");
         }
-
-        // TODO add a countdown timer in the last bit of the game
+        if (millis() - last_button_press_millis > 8000) {
+            Finished = true;
+            Serial.println("Ending game because no one pressed a button for too long.");
+        }
 
         // When game ends, Finished is set to TRUE
     } while (Finished == false);
@@ -364,9 +385,9 @@ void run_one_round_of_game() {
         set_light_status(i+1, 0);
     }
 
-    // Wait five seconds to show score
+    // Wait a few seconds to show score
     seg_cur_score.clear();
-    delay(2500);
+    delay(2000);
 
     do_display_score();
     if (score >= cur_hi_score) {
@@ -376,12 +397,12 @@ void run_one_round_of_game() {
         do_display_score();
         
         // blink the new score and high score for 5000ms
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 6; i++) {
             seg_cur_score.clear();
             seg_hi_score.clear();
-            delay(1000);
-            do_display_score();
             delay(500);
+            do_display_score();
+            delay(1000);
         }
 
     }
