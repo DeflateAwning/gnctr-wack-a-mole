@@ -2,6 +2,8 @@
 # Format documentation: https://kicad.org/help/file-formats/
 # Source: https://github.com/github/gitignore/blob/main/KiCad.gitignore
 
+*-backups/
+
 # Temporary files
 *.000
 *.bak
